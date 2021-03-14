@@ -1,0 +1,813 @@
+openapi: 3.0.1
+info:
+  title: Admin Panel API for Gabinet and Terappy
+  description: |
+    HTTP REST-like API for Admin Panel in Gabinet and Terappy
+
+    # Conventions
+    * Some request bodies contain more fields than they really need/use (eg. ID field), but they are kept for models clarity.
+    * Available date formats (time zone in `Config`):
+      * date-time: `YYYY-mm-dd HH:mm`
+      * date: `YYYY-mm-dd`
+      * time: `HH:mm`
+      * long: UNIX timestamp; number of seconds elapsed since UNIX epoch
+    * Every endpoint can respond with `500 Internal Server Error`
+
+    # Auth
+    * Login + password, if success `JSON Web Token` returned in `LoginResponse`. Once issued token is invalidated only after it's expiration time. Logout should be performed by 'forgetting' the token.
+
+    # Headers
+    * Authorization with JWT token, eg. `Authorization: Bearer eyJhbGciO...`
+    * Accept-Language with client system language
+    * Accept/Content-Type: `application/json` except for image upload
+    * X-Request-Id: TODO
+    * ID -> UUID
+    
+  version: 0.0.1
+servers:
+- url: admin.costubedzie.pl
+tags:
+- name: login
+  description: Login, password reset
+- name: therapist
+  description: CRUD for all therapists in Gabinet.Link
+- name: client
+  description: CRUD for all clients in Terappy
+- name: notification
+  description: Admin notification
+- name: calendar
+  description: Therapist's calendar
+- name: admin
+  description: CRUD for admins
+  
+security:
+  - BearerAuth: []
+
+paths:
+  /login:
+    post:
+      security: []
+      tags:
+      - login
+      summary: Login
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: LoginRequest
+              required:
+              - login
+              - password
+              type: object
+              properties:
+                login:
+                  type: string
+                  description: login
+                  example: mKowalski
+                password:
+                  type: string
+                  description: Password for admin
+                  example: "Very secret"
+
+        required: false
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        400:
+          description: Invalid Request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+      x-codegen-request-body-name: loginAndPassword
+  /login/refreshToken:
+    post:
+      security: []
+      tags:
+      - login
+      summary: Refresh token
+      operationId: refreshToken
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        400:
+          description: Invalid Request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+  /login/resetPasswordRequest:
+    post:
+      security: []
+      tags:
+      - login
+      summary: Request reset password via email
+      operationId: requestResetPasswordEmail
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: ResetPasswordRequest
+              required:
+              - email
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+        required: false
+      responses:
+        202:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        400:
+          description: Invalid Request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+      x-codegen-request-body-name: email
+
+
+  /therapist:
+    get:
+      tags:
+      - therapist
+      summary: Get all therapists
+      operationId: getAllTherapists
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                title: Therapists
+                type: array
+                items:
+                  $ref: '#/components/schemas/TherapistProfile'
+    post:
+      tags:
+      - therapist
+      summary: Create a therapist profile
+      description: Only for therapist without an account.
+      operationId: createTherapist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: CreateTherapistRequest
+              required:
+              - email
+              - name
+              - pin
+              - phone
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Marek Nowak
+                phone:
+                  type: string
+                  example: "555666777"
+                password:
+                  type: string
+                  example: Haslo123
+                email:
+                  type: string
+                  format: email
+        required: true
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: Invalid Request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+      x-codegen-request-body-name: client
+                  
+  /therapist/{id}:
+    get:
+      tags:
+      - therapist
+      summary: Get specific therpaist using UIDD
+      operationId: getTherapist
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                title: Therapist
+                type: object
+                items:
+                  $ref: '#/components/schemas/TherapistProfile'
+        404:
+          description: User not found.
+          content: {}
+    delete:
+      tags:
+      - therapist
+      summary: Delete specific therpaist
+      operationId: deleteTherapist
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: OK
+          content: {}
+        404:
+          description: User not found.
+          content: {}
+          
+  /client: 
+    get:
+      tags:
+      - client
+      summary: Get all clients
+      operationId: getAllCients
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                title: Clients
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientProfile'
+    post:
+      tags:
+      - client
+      summary: Create an client profile
+      description: Only for clients without an account.
+      operationId: createClient
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: CreateClientRequest
+              required:
+              - email
+              - name
+              - password
+              - pin
+              - phone
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Marek Nowak
+                phone:
+                  type: string
+                  example: "555666777"
+                password:
+                  type: string
+                  example: Haslo123
+                pin:
+                  type: string
+                  example: "666777"
+                email:
+                  type: string
+                  format: email
+        required: true
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: Invalid Request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+      x-codegen-request-body-name: client
+  /client/{id}:
+    get:
+      tags:
+      - client
+      summary: Get specific client using UIDD
+      operationId: getClient
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                title: Client
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientProfile'
+    delete:
+      tags:
+      - client
+      summary: Delete specific client
+      operationId: deleteClient
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: OK
+          content: {}
+        404:
+          description: User not found
+          content: {}
+        
+  /notifications:
+    get:
+      tags:
+      - notification
+      summary: Get notifications
+      operationId: getNotifications
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                title: Notifications
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+  /notifications/unread:
+    get:
+      tags:
+      - notification
+      summary: Get unread notifications count
+      operationId: getUnreadNotificationsCount
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                title: UnreadNotificaitonsCount
+                required:
+                - number
+                type: object
+                properties:
+                  number:
+                    type: number
+                    format: int
+  /notifications/read:
+    post:
+      tags:
+      - notification
+      summary: Mark notifications as read
+      description: Mark all nofitications with ID less or equal than that one provided
+        in body.
+      operationId: markAllNotificationsAsRead
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: ReadNotificationsRequestBody
+              required:
+              - lastId
+              type: object
+              properties:
+                lastId:
+                  type: string
+        required: false
+      responses:
+        200:
+          description: OK
+          content: {}
+      x-codegen-request-body-name: lastNotificationId
+  /notifications/{id}/read:
+    post:
+      tags:
+      - notification
+      summary: Mark a notification as read
+      operationId: markNotificationsAsRead
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        200:
+          description: OK
+          content: {}
+
+  /admin:
+    get:
+      tags:
+      - admin
+      summary: Get all admins info
+      operationId: getAdmins
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Admin
+                items:
+                  $ref: '#/components/schemas/AdminProfile'
+    post:
+      tags:
+      - admin
+      summary: Create an admin profile
+      description: Only for admins without an account.
+      operationId: createAdmin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: CreateAdminRequest
+              required:
+              - email
+              - name
+              - password
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Marek Nowak
+                password:
+                  type: string
+                  example: Haslo123
+                email:
+                  type: string
+                  format: email
+        required: true
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProfile'
+        400:
+          description: Invalid Request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+      x-codegen-request-body-name: admin
+  
+  /admin/{id}:
+    get:
+      tags:
+      - admin
+      summary: Get only one admin info
+      operationId: getAdmin
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+            type: string
+      responses:
+       200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Admin
+                items:
+                  $ref: '#/components/schemas/AdminProfile'
+    delete:
+      tags:
+      - admin
+      summary: Delete admin
+      operationId: deleteAdmin
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content: {}
+        404:
+          description: Not Found.
+          content: {}
+ 
+  /admin/changePassword:
+    post:
+      tags:
+      - admin
+      summary: Change Password for admin account
+      operationId: changePassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: ChangeAdminPassword
+              required:
+              - oldPassword
+              - newPassword
+              type: object
+              properties:
+                oldPassword:
+                  type: string
+                  example: StareHaslo123
+                newPassword:
+                  type: string
+                  example: NoweHaslo123
+      responses:
+        204:
+          description: OK
+          content: {}
+        400:
+          description: Invalid Request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+  
+  /admin/changeLogin:
+    post:
+      tags:
+      - admin
+      summary: Change login for admin account
+      operationId: changeLogin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: ChangeAdminPassword
+              required:
+              - oldLogin
+              - newLogin
+              type: object
+              properties:
+                oldLogin:
+                  type: string
+                  example: mKowalski
+                newLogin:
+                  type: string
+                  example: kowal
+      responses:
+        204:
+          description: OK
+          content: {}
+        400:
+          description: Invalid Request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    LoginResponse:
+      required:
+        - config
+        - profile
+      type: object
+      properties:
+        token:
+          type: string
+          description: access token
+          example: "My-Token"
+        config:
+          $ref: '#/components/schemas/Config'
+        profile:
+          $ref: '#/components/schemas/AdminProfile'
+    Config:
+      required:
+      - calendarPollingInterval
+      - country
+      - currency
+      - invitationUrl
+      - language
+      - notificationPollingInterval
+      - serverUrl
+      - timeZone
+      type: object
+      properties:
+        serverUrl:
+          type: string
+          example: www.costubedzie.pl
+        timeZone:
+          type: string
+          description: ISO 8601 format, eg. +01:00
+          format: ±hh:mm
+        authMethod:
+          type: string
+          enum:
+          - unknown
+          - pin
+
+    AdminProfile:
+      items:
+        title: AdminDetails
+        required:
+        - id
+        - name
+        - login
+        type: object
+        properties:
+          id:
+            type: string
+            example: "ijfsdif224211"
+          name:
+            type: string
+            example: Marek Kowalski
+          login:
+            type: string
+            example: mkowalski
+    Phone:
+      required:
+      - areaCode
+      - number
+      type: object
+      properties:
+        number:
+          type: string
+          example: "666777888"
+        areaCode:
+          type: string
+          description: calling code without '+'. i.e. 48 for Poland
+          example: "48"
+      example:
+        areaCode: "48"
+        number: "535613973"
+        
+    Specialization:
+      required:
+      - id
+      - description
+      type: object
+      properties:
+        id:
+          type: string
+          example: fhu2223fd2323
+        description:
+          type: string
+          example: Terapia lekowa
+    ClientProfile:
+      required:
+      - id
+      - name
+      - email
+      - phone
+      - status
+      - age
+      - psychologicalProblems
+      type: object
+      properties:
+        id:
+          type: string
+          example: fhu2223fd2323
+        name:
+          type: string
+          example: Marek Nowak
+        email:
+          type: string
+          format: email
+        phone:
+          $ref: '#/components/schemas/Phone'
+        age:
+          type: integer
+          example: 23
+        psychologicalProblems:
+          type: string
+          example: Lęki i stres
+    
+    TherapistProfile:
+      required:
+      - id
+      - name
+      - email
+      - phone
+      - status
+      - psychologicalProblems
+      type: object
+      properties:
+        id:
+          type: string
+          example: fhu2223fd2323
+        name:
+          type: string
+          example: Marek Nowak
+        email:
+          type: string
+          format: email
+        phone:
+          $ref: '#/components/schemas/Phone'
+        status:
+          $ref: '#/components/schemas/Status'
+          
+    Status:
+      required:
+      - id
+      - read
+      - text
+      - timestamp
+      type: object
+      properties:
+        id:
+          type: string
+          example: 24njfdjf23
+        text:
+          type: string
+          example: Moje kwalyfikacje
+        statusType:
+          type: string
+          enum:
+          - accepted
+          - declined
+          - inProgress
+        read:
+          type: boolean
+          default: false
+    Notification:
+      required:
+      - id
+      - read
+      - text
+      - timestamp
+      type: object
+      properties:
+        id: 
+          type: string
+          example: fcjje234
+        text:
+          type: string
+          description: required, except when type = 'in progress'
+          example: Zmieniono nazwę użytkownika
+        notificationType:
+          type: string
+          enum:
+          - penidngReservations
+          - needConfirmation
+          - sessionSoon
+          - sessionInProgress
+          - defineTSessionForReservation
+          - reservationCancelledLittleTime
+          - reservationCancelled
+          - defineCalendar
+          - fillProfile
+          - textMessage
+          - systemMessage
+          - verificationInfo
+          - subscriptionInfo
+        read:
+          type: boolean
+          default: false
+   
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties:
+            type: string
+          description: map with form field paths (eg. client.name) as keys and validation
+            errors as values
+        code:
+          type: integer
+      example:
+        message: Wrong data was provided
+        details:
+          client.name: sth
+    
+  
